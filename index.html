@@ -93,7 +93,7 @@
         <div class="timeline"><span>Start</span><span>Drag to explore</span><span>Finish</span></div>
         <input id="progress" type="range" min="0" max="1000" value="0" aria-label="Proof animation progress">
         <div class="legend"><span class="key"><i class="swatch moving"></i>Square on AC</span><span class="key"><i class="swatch"></i>Squares on AB, BC</span></div>
-        <p class="caption">Drag A and B freely. C moves on the faint circle, keeping the right angle.</p>
+        <p class="caption">Drag A and B freely. C can move around the circle, staying clear of A and B.</p>
       </div>
     </aside>
   </section>
@@ -191,7 +191,7 @@
   document.getElementById('reset').addEventListener('click',()=>{running=false;last=0;cancelAnimationFrame(raf);slider.value='0';play.textContent='▶  Play proof';render()});
   const fromPointer=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());return {x:p.x,y:p.y}};
   const clamp=p=>({x:Math.max(15,Math.min(885,p.x)),y:Math.max(15,Math.min(885,p.y))});
-  const rightAnglePoint=p=>{const ab=sub(B,A),radius=length(ab)/2,mid=mul(add(A,B),.5),u=unit(ab),side=Math.sign(cross(ab,sub(C,A)))||1,n=mul(perp(u),side);let radial=sub(p,mid);if(length(radial)<1)radial=sub(C,mid);let along=dot(radial,u),height=dot(radial,n),minimum=Math.min(24,radius*.2);height=Math.max(minimum,Math.min(radius*.95,height));along=(Math.sign(along)||Math.sign(dot(sub(C,mid),u))||1)*Math.sqrt(Math.max(0,radius*radius-height*height));return add(mid,add(mul(u,along),mul(n,height)))};
+  const rightAnglePoint=p=>{const ab=sub(B,A),radius=length(ab)/2,mid=mul(add(A,B),.5),u=unit(ab),n=perp(u);let radial=sub(p,mid);if(length(radial)<1)radial=sub(C,mid);let along=dot(radial,u),height=dot(radial,n),minimum=Math.min(24,radius*.2),side=Math.sign(height)||Math.sign(dot(sub(C,mid),n))||1;height=side*Math.max(minimum,Math.min(radius,Math.abs(height)));along=(Math.sign(along)||Math.sign(dot(sub(C,mid),u))||1)*Math.sqrt(Math.max(0,radius*radius-height*height));return add(mid,add(mul(u,along),mul(n,height)))};
   const moveEndpoint=(name,p)=>{let q=clamp(p),other=name==='A'?B:A,offset=sub(q,other);if(length(offset)<30){const oldOffset=sub(name==='A'?A:B,other);offset=mul(unit(length(oldOffset)>1?oldOffset:{x:1,y:0}),30);q=add(other,offset)}if(name==='A')A=q;else B=q;C=rightAnglePoint(C)};
   let dragging=null;
   for(const name of ['A','B','C']){
