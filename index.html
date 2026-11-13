@@ -121,25 +121,40 @@
     const circle=document.createElementNS('http://www.w3.org/2000/svg','circle'); circle.setAttribute('r','10'); circle.setAttribute('fill','#fff'); circle.setAttribute('stroke','#286a50'); circle.setAttribute('stroke-width','3'); circle.setAttribute('class','handle'); circle.setAttribute('tabindex','0'); circle.setAttribute('role','button'); circle.setAttribute('aria-label',`Point ${name}; drag or use arrow keys to move`); circle.style.cursor='grab'; circle.style.touchAction='none'; svg.appendChild(circle); handles[name]=circle;
   }
   const phases=[
-    {at:0,title:'Three squares',text:'Drop the altitude from C to AB at Z. It divides the square on the hypotenuse into two rectangles.'},
-    {at:.25,title:'Shear toward B',text:'Hold AX fixed. Slide the opposite edge parallel to AX until its vertex at C reaches B. The square becomes a parallelogram.'},
-    {at:.52,title:'Turn about A',text:'Rotate the parallelogram a quarter turn around A. B arrives at Y, and the original vertex X lands at C.'},
-    {at:.77,title:'Slide down to Z',text:'Keep AY fixed and slide the parallelogram along the perpendicular. When C reaches Z, it exactly fills the left rectangle.'},
+    {at:0,title:'A right triangle',text:'Start with the draggable right triangle. Move any vertex; the angle at C remains right.'},
+    {at:.18,title:'Grow the squares',text:'Squares build outward from AC, BC, and AB, with every new corner moving away from the triangle.'},
+    {at:.21,title:'Shear toward B',text:'Hold AX fixed. Slide the opposite edge parallel to AX until its vertex at C reaches B. The square becomes a parallelogram.'},
+    {at:.45,title:'Turn about A',text:'Rotate the parallelogram a quarter turn around A. B travels to Y, and the original vertex X lands at C.'},
+    {at:.70,title:'Slide down to Z',text:'Keep AY fixed and slide the parallelogram along the perpendicular. When C reaches Z, it exactly fills the left rectangle.'},
   ];
   const smooth=t=>t*t*(3-2*t), mix=(p,q,t)=>add(mul(p,1-t),mul(q,t));
   let geom;
   const stage=t=>{
     const {X,D,Z,Y,U,squareFar}=geom; let pts, opacity=0;
-    if(t<.25){pts=[A,X,D,C]}
-    else if(t<.52){let u=smooth((t-.25)/.27); let c=mix(C,B,u); pts=[A,X,add(c,sub(X,A)),c]}
-    else if(t<.77){let u=smooth((t-.52)/.25), angle=geom.orientation*Math.PI/2*u; const rotateBy=p=>{const v=sub(p,A),c=Math.cos(angle),s=Math.sin(angle);return add(A,{x:v.x*c-v.y*s,y:v.x*s+v.y*c})}; pts=[A,X,add(B,sub(X,A)),B].map(rotateBy)
-    } else {let u=smooth((t-.77)/.23); const start=[A,C,add(C,sub(Y,A)),Y], end=[A,Z,add(Z,sub(Y,A)),Y]; pts=start.map((p,i)=>mix(p,end[i],u)); opacity=u}
+    const growth=smooth(Math.min(1,t/.18));
+    const blend=smooth(Math.max(0,Math.min(1,(t-.18)/.03)));
+    const nAC=mul(sub(X,A),growth), nBC=mul(geom.nBC,growth), grownU=mul(U,growth);
+    const grownX=add(A,nAC), grownD=add(C,nAC);
+    staticSquares.innerHTML=`<polygon points="${poly([A,C,grownD,grownX])}" opacity="${1-blend}"/><polygon points="${poly([B,C,add(C,nBC),add(B,nBC)])}"/>`;
+    setPoly('rightSquare',[A,B,add(B,grownU),add(A,grownU)]);
+    staticSquares.setAttribute('opacity',String(growth));
+    document.getElementById('rightSquare').setAttribute('opacity',String(growth));
+    if(t<.21){pts=[A,X,D,C]}
+    else if(t<.45){let u=smooth((t-.21)/.24); let c=mix(C,B,u); pts=[A,X,add(c,sub(X,A)),c]}
+    else if(t<.70){let u=smooth((t-.45)/.25), angle=geom.orientation*Math.PI/2*u; const rotateBy=p=>{const v=sub(p,A),c=Math.cos(angle),s=Math.sin(angle);return add(A,{x:v.x*c-v.y*s,y:v.x*s+v.y*c})}; pts=[A,X,add(B,sub(X,A)),B].map(rotateBy)
+    } else {let u=smooth(Math.min(1,(t-.70)/.24)); const start=[A,C,add(C,sub(Y,A)),Y], end=[A,Z,add(Z,sub(Y,A)),Y]; pts=start.map((p,i)=>mix(p,end[i],u)); opacity=u}
     setPoly('moving',pts);
+    document.getElementById('moving').setAttribute('opacity',String(blend));
     const rectA=[A,Y,add(Z,U),Z], rectB=[Z,B,squareFar,add(Z,U)];
     setPoly('leftRect',rectA); setPoly('rightRect',rectB);
     document.getElementById('partition').setAttribute('opacity',String(opacity));
+    const altitudeOpacity=smooth(Math.max(0,Math.min(1,(t-.18)/.06)));
+    document.getElementById('altitude').setAttribute('opacity',String(altitudeOpacity));
+    document.getElementById('labels').querySelector('text:nth-child(4)').style.opacity=String(altitudeOpacity);
+    document.getElementById('areaLabels').style.opacity=String(growth);
+    document.querySelector('.equation').style.opacity=String(altitudeOpacity);
     const phase=[...phases].reverse().find(p=>t>=p.at)||phases[0];
-    document.getElementById('stepnum').textContent=`${String(phases.indexOf(phase)+1).padStart(2,'0')} / 04`;
+    document.getElementById('stepnum').textContent=`${String(phases.indexOf(phase)+1).padStart(2,'0')} / 05`;
     document.getElementById('heading').textContent=phase.title; document.getElementById('explanation').textContent=phase.text;
   };
   const drawGeometry=()=>{
@@ -161,7 +176,7 @@
     const centroid=pts=>mul(pts.reduce((sum,p)=>add(sum,p),{x:0,y:0}),.25);
     [["AC²",[A,C,D,X]],["BC²",squareBC],["AB²",[A,B,squareFar,Y]]].forEach(([name,pts])=>{const q=centroid(pts);areaLabels[name].setAttribute('x',q.x);areaLabels[name].setAttribute('y',q.y+6)});
     for(const name of ['A','B','C']){handles[name].setAttribute('cx',{A,B,C}[name].x);handles[name].setAttribute('cy',{A,B,C}[name].y)}
-    geom={X,D,Z,Y,U,squareFar,orientation,abLength,acLength,bcLength};
+    geom={X,D,Z,Y,U,squareFar,nBC,orientation,abLength,acLength,bcLength};
     render();
   };
   const slider=document.getElementById('progress'), play=document.getElementById('play'); let running=false, last=0, raf=0;
