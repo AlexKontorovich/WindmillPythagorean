@@ -78,36 +78,35 @@
         <div class="timeline"><span>Start</span><span>Drag to explore</span><span>Finish</span></div>
         <input id="progress" type="range" min="0" max="1000" value="0" aria-label="Proof animation progress">
         <div class="legend"><span class="key"><i class="swatch moving"></i>Square on AC</span><span class="key"><i class="swatch"></i>Squares on AB, BC</span></div>
-        <p class="caption">The other small square undergoes the same construction on the other half.</p>
+        <p class="caption">Drag A, B, or C. The right angle at C stays fixed.</p>
       </div>
     </aside>
   </section>
 </main>
 <script>
 (() => {
-  const A={x:250,y:420}, B={x:650,y:420}, C={x:394,y:228}, Z={x:394,y:420};
+  let A={x:250,y:420}, B={x:650,y:420}, C={x:394,y:228};
   const sub=(p,q)=>({x:p.x-q.x,y:p.y-q.y}), add=(p,q)=>({x:p.x+q.x,y:p.y+q.y}), mul=(p,k)=>({x:p.x*k,y:p.y*k});
-  const AC=sub(C,A), BC=sub(C,B), AB=sub(B,A);
-  const X=add(A,{x:AC.y,y:-AC.x}); // outward normal to AC, |AX|=|AC|
-  const D=add(C,sub(X,A));
-  const Y=add(A,{x:0,y:400}); // quarter-turn image of B around A
+  const dot=(p,q)=>p.x*q.x+p.y*q.y, cross=(p,q)=>p.x*q.y-p.y*q.x, length=p=>Math.hypot(p.x,p.y);
+  const unit=p=>mul(p,1/Math.max(length(p),1e-6));
+  const rotate=(p,orientation)=>orientation>0?{x:-p.y,y:p.x}:{x:p.y,y:-p.x};
+  const perp=p=>({x:-p.y,y:p.x});
   const point=p=>`${p.x},${p.y}`, poly=pts=>pts.map(point).join(' ');
   const setPoly=(id,pts)=>document.getElementById(id).setAttribute('points',poly(pts));
   const setLine=(id,p,q)=>{const e=document.getElementById(id);e.setAttribute('x1',p.x);e.setAttribute('y1',p.y);e.setAttribute('x2',q.x);e.setAttribute('y2',q.y)};
-  setPoly('tri',[A,C,B]);
-  // Squares erected outward from the triangle.
-  const U={x:0,y:400}, nBC={x:-BC.y,y:BC.x};
-  setPoly('staticSquares',[A,C,D,X]);
-  document.getElementById('staticSquares').innerHTML=`<polygon points="${poly([B,C,add(C,nBC),add(B,nBC)])}"/>`;
-  const squareFar=add(B,U); setPoly('rightSquare',[A,B,squareFar,Y]);
-  setLine('altline',C,Z);
-  document.getElementById('rightMark').setAttribute('d',`M ${C.x+16} ${C.y+12} l -12 16 l 16 12`);
-  const lab=document.getElementById('labels');
-  const label=(t,p)=>{const e=document.createElementNS('http://www.w3.org/2000/svg','text');e.textContent=t;e.setAttribute('x',p.x);e.setAttribute('y',p.y);lab.appendChild(e)};
-  label('A',{x:A.x-24,y:A.y+27}); label('B',{x:B.x+12,y:B.y+27}); label('C',{x:C.x-7,y:C.y-15}); label('Z',{x:Z.x-8,y:Z.y+28});
-  const area=document.getElementById('areaLabels');
-  const areaText=(t,p)=>{const e=document.createElementNS('http://www.w3.org/2000/svg','text');e.textContent=t;e.setAttribute('x',p.x);e.setAttribute('y',p.y);area.appendChild(e)};
-  areaText('AC²',{x:175,y:186}); areaText('BC²',{x:764,y:265}); areaText('AB²',{x:450,y:780});
+  const svg=document.querySelector('svg'), staticSquares=document.getElementById('staticSquares');
+  const labels={};
+  for(const name of ['A','B','C','Z']){
+    const text=document.createElementNS('http://www.w3.org/2000/svg','text'); text.textContent=name; text.setAttribute('fill','#27342c'); text.setAttribute('font-family','Georgia,serif'); text.setAttribute('font-size','24'); text.setAttribute('font-style','italic'); document.getElementById('labels').appendChild(text); labels[name]=text;
+  }
+  const areaLabels={};
+  for(const name of ['AC²','BC²','AB²']){
+    const text=document.createElementNS('http://www.w3.org/2000/svg','text'); text.textContent=name; text.setAttribute('fill','#496d55'); text.setAttribute('font-family','ui-sans-serif,system-ui'); text.setAttribute('font-size','17'); text.setAttribute('font-weight','650'); text.setAttribute('text-anchor','middle'); document.getElementById('areaLabels').appendChild(text); areaLabels[name]=text;
+  }
+  const handles={};
+  for(const name of ['A','B','C']){
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle'); circle.setAttribute('r','10'); circle.setAttribute('fill','#fff'); circle.setAttribute('stroke','#286a50'); circle.setAttribute('stroke-width','3'); circle.setAttribute('class','handle'); circle.setAttribute('tabindex','0'); circle.setAttribute('role','button'); circle.setAttribute('aria-label',`Point ${name}; drag or use arrow keys to move`); circle.style.cursor='grab'; circle.style.touchAction='none'; svg.appendChild(circle); handles[name]=circle;
+  }
   const phases=[
     {at:0,title:'Three squares',text:'Drop the altitude from C to AB at Z. It divides the square on the hypotenuse into two rectangles.'},
     {at:.25,title:'Shear toward B',text:'Hold AX fixed. Slide the opposite edge parallel to AX until its vertex at C reaches B. The square becomes a parallelogram.'},
@@ -115,11 +114,12 @@
     {at:.77,title:'Slide down to Z',text:'Keep AY fixed and slide the parallelogram along the perpendicular. When C reaches Z, it exactly fills the left rectangle.'},
   ];
   const smooth=t=>t*t*(3-2*t), mix=(p,q,t)=>add(mul(p,1-t),mul(q,t));
+  let geom;
   const stage=t=>{
-    let pts, opacity=0;
+    const {X,D,Z,Y,U,squareFar}=geom; let pts, opacity=0;
     if(t<.25){pts=[A,X,D,C]}
     else if(t<.52){let u=smooth((t-.25)/.27); let c=mix(C,B,u); pts=[A,X,add(c,sub(X,A)),c]}
-    else if(t<.77){let u=smooth((t-.52)/.25); const rotate=p=>{const v=sub(p,A);return add(A,{x:-v.y,y:v.x})}; const raw=[A,X,add(B,sub(X,A)),B].map(rotate); const turned=[A,C,add(C,sub(Y,A)),Y]; pts=raw.map((p,i)=>mix(p,turned[i],u));
+    else if(t<.77){let u=smooth((t-.52)/.25); const raw=[A,X,add(B,sub(X,A)),B].map(p=>add(A,rotate(sub(p,A),geom.orientation))); const turned=[A,C,add(C,sub(Y,A)),Y]; pts=raw.map((p,i)=>mix(p,turned[i],u))
     } else {let u=smooth((t-.77)/.23); const start=[A,C,add(C,sub(Y,A)),Y], end=[A,Z,add(Z,sub(Y,A)),Y]; pts=start.map((p,i)=>mix(p,end[i],u)); opacity=u}
     setPoly('moving',pts);
     const rectA=[A,Y,add(Z,U),Z], rectB=[Z,B,squareFar,add(Z,U)];
@@ -129,12 +129,44 @@
     document.getElementById('stepnum').textContent=`${String(phases.indexOf(phase)+1).padStart(2,'0')} / 04`;
     document.getElementById('heading').textContent=phase.title; document.getElementById('explanation').textContent=phase.text;
   };
+  const drawGeometry=()=>{
+    const AB=sub(B,A), AC=sub(C,A), BC=sub(C,B), abLength=length(AB), acLength=length(AC), bcLength=length(BC);
+    const orientation=Math.sign(cross(AC,sub(B,A)))||1;
+    const Z=add(A,mul(AB,dot(sub(C,A),AB)/Math.max(dot(AB,AB),1e-6)));
+    const X=add(A,mul({x:AC.y,y:-AC.x},orientation)), D=add(C,sub(X,A));
+    const U=mul(rotate(AB,orientation),1), Y=add(A,U), squareFar=add(B,U);
+    const nBC=mul({x:-BC.y,y:BC.x},-orientation);
+    const squareBC=[B,C,add(C,nBC),add(B,nBC)];
+    staticSquares.innerHTML=`<polygon points="${poly([A,C,D,X])}"/><polygon points="${poly(squareBC)}"/>`;
+    setPoly('rightSquare',[A,B,squareFar,Y]); setPoly('tri',[A,C,B]); setLine('altline',C,Z);
+    const armA=mul(unit(sub(A,C)),20), armB=mul(unit(sub(B,C)),20), mark1=add(C,armA), mark2=add(mark1,armB), mark3=add(C,armB);
+    document.getElementById('rightMark').setAttribute('d',`M ${mark1.x} ${mark1.y} L ${mark2.x} ${mark2.y} L ${mark3.x} ${mark3.y}`);
+    const labelOffsets={A:mul(unit(add(mul(sub(B,A),-1),mul(sub(C,A),-1))),25),B:mul(unit(add(sub(B,A),mul(sub(C,B),-1))),25),C:mul(unit(add(sub(A,C),sub(B,C))),-25),Z:mul(unit(rotate(AB,orientation)),26)};
+    for(const name of ['A','B','C','Z']){const p=name==='Z'?Z:{A,B,C}[name], q=add(p,labelOffsets[name]);labels[name].setAttribute('x',q.x);labels[name].setAttribute('y',q.y+8)}
+    const centroid=pts=>mul(pts.reduce((sum,p)=>add(sum,p),{x:0,y:0}),.25);
+    [["AC²",[A,C,D,X]],["BC²",squareBC],["AB²",[A,B,squareFar,Y]]].forEach(([name,pts])=>{const q=centroid(pts);areaLabels[name].setAttribute('x',q.x);areaLabels[name].setAttribute('y',q.y+6)});
+    for(const name of ['A','B','C']){handles[name].setAttribute('cx',{A,B,C}[name].x);handles[name].setAttribute('cy',{A,B,C}[name].y)}
+    geom={X,D,Z,Y,U,squareFar,orientation,abLength,acLength,bcLength};
+    render();
+  };
   const slider=document.getElementById('progress'), play=document.getElementById('play'); let running=false, last=0, raf=0;
   const render=()=>stage(Number(slider.value)/1000); slider.addEventListener('input',()=>{running=false;cancelAnimationFrame(raf);play.textContent='▶  Play proof';render()});
   function tick(now){if(!running)return;if(!last)last=now;const delta=now-last;last=now;let v=Number(slider.value)+delta*0.16;if(v>=1000){v=1000;running=false;play.textContent='↺  Replay'}slider.value=String(v);render();if(running)raf=requestAnimationFrame(tick)}
   play.addEventListener('click',()=>{if(running){running=false;last=0;cancelAnimationFrame(raf);play.textContent='▶  Play proof'}else{if(Number(slider.value)>=1000)slider.value='0';running=true;last=0;play.textContent='Ⅱ  Pause';raf=requestAnimationFrame(tick)}});
   document.getElementById('reset').addEventListener('click',()=>{running=false;last=0;cancelAnimationFrame(raf);slider.value='0';play.textContent='▶  Play proof';render()});
-  render();
+  const fromPointer=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());return {x:p.x,y:p.y}};
+  const clamp=p=>({x:Math.max(15,Math.min(885,p.x)),y:Math.max(15,Math.min(885,p.y))});
+  const projectLeg=(p,origin,direction,current)=>{let along=dot(sub(p,origin),direction)/Math.max(dot(direction,direction),1e-6);const old=dot(sub(current,origin),direction);if(Math.abs(along)<30)along=(Math.sign(old)||1)*30;return add(origin,mul(direction,along))};
+  const rightAnglePoint=p=>{const ab=sub(B,A),radius=length(ab)/2,mid=mul(add(A,B),.5),u=unit(ab),side=Math.sign(cross(ab,sub(C,A)))||1,n=mul(perp(u),side);let radial=sub(p,mid);if(length(radial)<1)radial=sub(C,mid);let along=dot(radial,u),height=dot(radial,n),minimum=Math.min(24,radius*.2);height=Math.max(minimum,Math.min(radius*.95,height));along=(Math.sign(along)||Math.sign(dot(sub(C,mid),u))||1)*Math.sqrt(Math.max(0,radius*radius-height*height));return add(mid,add(mul(u,along),mul(n,height)))};
+  let dragging=null;
+  for(const name of ['A','B','C']){
+    handles[name].addEventListener('pointerdown',e=>{e.preventDefault();dragging=name;handles[name].setPointerCapture(e.pointerId);handles[name].style.cursor='grabbing'});
+    handles[name].addEventListener('pointermove',e=>{if(dragging!==name)return;const p=clamp(fromPointer(e));if(name==='A'){const direction=unit(perp(sub(C,B)));A=projectLeg(p,C,direction,A)}else if(name==='B'){const direction=unit(perp(sub(C,A)));B=projectLeg(p,C,direction,B)}else C=rightAnglePoint(p);drawGeometry()});
+    const stop=e=>{if(dragging===name){dragging=null;handles[name].style.cursor='grab';if(handles[name].hasPointerCapture(e.pointerId))handles[name].releasePointerCapture(e.pointerId)}};
+    handles[name].addEventListener('pointerup',stop);handles[name].addEventListener('pointercancel',stop);
+    handles[name].addEventListener('keydown',e=>{const step=e.shiftKey?10:2, delta={ArrowLeft:{x:-step,y:0},ArrowRight:{x:step,y:0},ArrowUp:{x:0,y:-step},ArrowDown:{x:0,y:step}}[e.key];if(!delta)return;e.preventDefault();const p=add({A,B,C}[name],delta);if(name==='A')A=projectLeg(p,C,unit(perp(sub(C,B))),A);else if(name==='B')B=projectLeg(p,C,unit(perp(sub(C,A))),B);else C=rightAnglePoint(p);drawGeometry()});
+  }
+  drawGeometry();
 })();
 </script>
 </body>
