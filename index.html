@@ -119,7 +119,7 @@
     const {X,D,Z,Y,U,squareFar}=geom; let pts, opacity=0;
     if(t<.25){pts=[A,X,D,C]}
     else if(t<.52){let u=smooth((t-.25)/.27); let c=mix(C,B,u); pts=[A,X,add(c,sub(X,A)),c]}
-    else if(t<.77){let u=smooth((t-.52)/.25); const raw=[A,X,add(B,sub(X,A)),B].map(p=>add(A,rotate(sub(p,A),geom.orientation))); const turned=[A,C,add(C,sub(Y,A)),Y]; pts=raw.map((p,i)=>mix(p,turned[i],u))
+    else if(t<.77){let u=smooth((t-.52)/.25), angle=geom.orientation*Math.PI/2*u; const rotateBy=p=>{const v=sub(p,A),c=Math.cos(angle),s=Math.sin(angle);return add(A,{x:v.x*c-v.y*s,y:v.x*s+v.y*c})}; pts=[A,X,add(B,sub(X,A)),B].map(rotateBy)
     } else {let u=smooth((t-.77)/.23); const start=[A,C,add(C,sub(Y,A)),Y], end=[A,Z,add(Z,sub(Y,A)),Y]; pts=start.map((p,i)=>mix(p,end[i],u)); opacity=u}
     setPoly('moving',pts);
     const rectA=[A,Y,add(Z,U),Z], rectB=[Z,B,squareFar,add(Z,U)];
