@@ -28,6 +28,7 @@
     #moving { fill:#f5ad57; fill-opacity:.75; stroke:#ffd28d; stroke-width:3.2; filter:drop-shadow(0 0 11px #f5ad5799) }
     #tri { fill:#211923!important; fill-opacity:.84!important; stroke:#fff2df!important; stroke-width:3.5!important }
     #rightMark { stroke:#fff2df; stroke-width:2.6 }
+    #thalesCircle { fill:none; stroke:#fff2df; stroke-width:1.7; stroke-dasharray:4 8; opacity:.3; pointer-events:none }
     .handle { fill:#fff2df!important; stroke:#7ce0cb!important; stroke-width:3.4!important; filter:drop-shadow(0 0 7px #7ce0cb99) }
     .side { padding:28px 24px; display:flex; flex-direction:column; min-height:540px }
     .side { background:linear-gradient(160deg,#2b202c,#211923 70%); }
@@ -76,6 +77,7 @@
         <g id="triangle" fill="#fff" fill-opacity=".87" stroke="#293b31" stroke-width="3" stroke-linejoin="round">
           <polygon id="tri"/>
         </g>
+        <circle id="thalesCircle" cx="0" cy="0" r="0" aria-hidden="true"/>
         <path id="rightMark" fill="none" stroke="#293b31" stroke-width="2"/>
         <g id="labels" fill="#27342c" font-family="Georgia,serif" font-size="24" font-style="italic"></g>
         <g id="areaLabels" fill="#496d55" font-family="ui-sans-serif,system-ui" font-size="17" font-weight="650" text-anchor="middle"></g>
@@ -91,7 +93,7 @@
         <div class="timeline"><span>Start</span><span>Drag to explore</span><span>Finish</span></div>
         <input id="progress" type="range" min="0" max="1000" value="0" aria-label="Proof animation progress">
         <div class="legend"><span class="key"><i class="swatch moving"></i>Square on AC</span><span class="key"><i class="swatch"></i>Squares on AB, BC</span></div>
-        <p class="caption">Drag A, B, or C. The right angle at C stays fixed.</p>
+        <p class="caption">Drag A and B freely. C moves on the faint circle, keeping the right angle.</p>
       </div>
     </aside>
   </section>
@@ -118,7 +120,7 @@
   }
   const handles={};
   for(const name of ['A','B','C']){
-    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle'); circle.setAttribute('r','10'); circle.setAttribute('fill','#fff'); circle.setAttribute('stroke','#286a50'); circle.setAttribute('stroke-width','3'); circle.setAttribute('class','handle'); circle.setAttribute('tabindex','0'); circle.setAttribute('role','button'); circle.setAttribute('aria-label',`Point ${name}; drag or use arrow keys to move`); circle.style.cursor='grab'; circle.style.touchAction='none'; svg.appendChild(circle); handles[name]=circle;
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle'); circle.setAttribute('r','10'); circle.setAttribute('fill','#fff'); circle.setAttribute('stroke','#286a50'); circle.setAttribute('stroke-width','3'); circle.setAttribute('class','handle'); circle.setAttribute('tabindex','0'); circle.setAttribute('role','button'); circle.setAttribute('aria-label',name==='C'?'Point C; drag around the circle':'Point '+name+'; drag freely'); circle.style.cursor='grab'; circle.style.touchAction='none'; svg.appendChild(circle); handles[name]=circle;
   }
   const phases=[
     {at:0,title:'A right triangle',text:'Start with the draggable right triangle. Move any vertex; the angle at C remains right.'},
@@ -169,6 +171,9 @@
     const squareBC=[B,C,add(C,nBC),add(B,nBC)];
     staticSquares.innerHTML=`<polygon points="${poly([A,C,D,X])}"/><polygon points="${poly(squareBC)}"/>`;
     setPoly('rightSquare',[A,B,squareFar,Y]); setPoly('tri',[A,C,B]); setLine('altline',C,Z);
+    document.getElementById('thalesCircle').setAttribute('cx',(A.x+B.x)/2);
+    document.getElementById('thalesCircle').setAttribute('cy',(A.y+B.y)/2);
+    document.getElementById('thalesCircle').setAttribute('r',abLength/2);
     const armA=mul(unit(sub(A,C)),20), armB=mul(unit(sub(B,C)),20), mark1=add(C,armA), mark2=add(mark1,armB), mark3=add(C,armB);
     document.getElementById('rightMark').setAttribute('d',`M ${mark1.x} ${mark1.y} L ${mark2.x} ${mark2.y} L ${mark3.x} ${mark3.y}`);
     const labelOffsets={A:mul(unit(add(mul(sub(B,A),-1),mul(sub(C,A),-1))),25),B:mul(unit(add(sub(B,A),mul(sub(C,B),-1))),25),C:mul(unit(add(sub(A,C),sub(B,C))),-25),Z:mul(unit(rotate(AB,orientation)),26)};
@@ -186,15 +191,15 @@
   document.getElementById('reset').addEventListener('click',()=>{running=false;last=0;cancelAnimationFrame(raf);slider.value='0';play.textContent='▶  Play proof';render()});
   const fromPointer=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());return {x:p.x,y:p.y}};
   const clamp=p=>({x:Math.max(15,Math.min(885,p.x)),y:Math.max(15,Math.min(885,p.y))});
-  const projectLeg=(p,origin,direction,current)=>{let along=dot(sub(p,origin),direction)/Math.max(dot(direction,direction),1e-6);const old=dot(sub(current,origin),direction);if(Math.abs(along)<30)along=(Math.sign(old)||1)*30;return add(origin,mul(direction,along))};
   const rightAnglePoint=p=>{const ab=sub(B,A),radius=length(ab)/2,mid=mul(add(A,B),.5),u=unit(ab),side=Math.sign(cross(ab,sub(C,A)))||1,n=mul(perp(u),side);let radial=sub(p,mid);if(length(radial)<1)radial=sub(C,mid);let along=dot(radial,u),height=dot(radial,n),minimum=Math.min(24,radius*.2);height=Math.max(minimum,Math.min(radius*.95,height));along=(Math.sign(along)||Math.sign(dot(sub(C,mid),u))||1)*Math.sqrt(Math.max(0,radius*radius-height*height));return add(mid,add(mul(u,along),mul(n,height)))};
+  const moveEndpoint=(name,p)=>{let q=clamp(p),other=name==='A'?B:A,offset=sub(q,other);if(length(offset)<30){const oldOffset=sub(name==='A'?A:B,other);offset=mul(unit(length(oldOffset)>1?oldOffset:{x:1,y:0}),30);q=add(other,offset)}if(name==='A')A=q;else B=q;C=rightAnglePoint(C)};
   let dragging=null;
   for(const name of ['A','B','C']){
     handles[name].addEventListener('pointerdown',e=>{e.preventDefault();dragging=name;handles[name].setPointerCapture(e.pointerId);handles[name].style.cursor='grabbing'});
-    handles[name].addEventListener('pointermove',e=>{if(dragging!==name)return;const p=clamp(fromPointer(e));if(name==='A'){const direction=unit(perp(sub(C,B)));A=projectLeg(p,C,direction,A)}else if(name==='B'){const direction=unit(perp(sub(C,A)));B=projectLeg(p,C,direction,B)}else C=rightAnglePoint(p);drawGeometry()});
+    handles[name].addEventListener('pointermove',e=>{if(dragging!==name)return;const p=fromPointer(e);if(name==='A'||name==='B')moveEndpoint(name,p);else C=rightAnglePoint(clamp(p));drawGeometry()});
     const stop=e=>{if(dragging===name){dragging=null;handles[name].style.cursor='grab';if(handles[name].hasPointerCapture(e.pointerId))handles[name].releasePointerCapture(e.pointerId)}};
     handles[name].addEventListener('pointerup',stop);handles[name].addEventListener('pointercancel',stop);
-    handles[name].addEventListener('keydown',e=>{const step=e.shiftKey?10:2, delta={ArrowLeft:{x:-step,y:0},ArrowRight:{x:step,y:0},ArrowUp:{x:0,y:-step},ArrowDown:{x:0,y:step}}[e.key];if(!delta)return;e.preventDefault();const p=add({A,B,C}[name],delta);if(name==='A')A=projectLeg(p,C,unit(perp(sub(C,B))),A);else if(name==='B')B=projectLeg(p,C,unit(perp(sub(C,A))),B);else C=rightAnglePoint(p);drawGeometry()});
+    handles[name].addEventListener('keydown',e=>{const step=e.shiftKey?10:2, delta={ArrowLeft:{x:-step,y:0},ArrowRight:{x:step,y:0},ArrowUp:{x:0,y:-step},ArrowDown:{x:0,y:step}}[e.key];if(!delta)return;e.preventDefault();const p=add({A,B,C}[name],delta);if(name==='A'||name==='B')moveEndpoint(name,p);else C=rightAnglePoint(clamp(p));drawGeometry()});
   }
   drawGeometry();
 })();
