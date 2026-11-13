@@ -135,7 +135,9 @@
     const Z=add(A,mul(AB,dot(sub(C,A),AB)/Math.max(dot(AB,AB),1e-6)));
     const X=add(A,mul({x:AC.y,y:-AC.x},orientation)), D=add(C,sub(X,A));
     const U=mul(rotate(AB,orientation),1), Y=add(A,U), squareFar=add(B,U);
-    const nBC=mul({x:-BC.y,y:BC.x},-orientation);
+    // For the directed side B→C, the triangle interior is on the opposite
+    // side from orientation(A,C,B), so this normal points away from it.
+    const nBC=mul({x:-BC.y,y:BC.x},orientation);
     const squareBC=[B,C,add(C,nBC),add(B,nBC)];
     staticSquares.innerHTML=`<polygon points="${poly([A,C,D,X])}"/><polygon points="${poly(squareBC)}"/>`;
     setPoly('rightSquare',[A,B,squareFar,Y]); setPoly('tri',[A,C,B]); setLine('altline',C,Z);
