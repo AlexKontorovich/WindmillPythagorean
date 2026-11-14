@@ -17,6 +17,7 @@
     .board { display:grid; grid-template-columns:minmax(0,1fr) 295px; background:#211925; border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:0 24px 80px #0008 }
     .drawing { min-width:0; background:radial-gradient(ellipse at 48% 43%,#332632 0%,#17121f 72%); padding:14px; display:grid; place-items:center; border-right:1px solid var(--line) }
     svg { width:100%; height:auto; max-height:74vh; overflow:visible }
+    .drawing, svg { touch-action:none; user-select:none; -webkit-user-select:none }
     #labels text { fill:#fff2df!important; font-family:ui-serif,Georgia,serif!important; font-size:25px!important; paint-order:stroke; stroke:#17121f; stroke-width:5px; stroke-linejoin:round }
     #areaLabels text { fill:#d2c1c1!important; font-size:17px!important; letter-spacing:.04em }
     #staticSquares polygon:first-child { fill:#ff786f; fill-opacity:.22; stroke:#ff9a83; stroke-width:2.6 }
@@ -30,7 +31,9 @@
     #tri { fill:#211923!important; fill-opacity:.84!important; stroke:#fff2df!important; stroke-width:3.5!important }
     #rightMark { stroke:#fff2df; stroke-width:2.6 }
     #thalesArc { fill:none; stroke:#fff2df; stroke-width:1.7; stroke-dasharray:4 8; opacity:.34; pointer-events:none }
-    .handle { fill:#fff2df!important; stroke:#7ce0cb!important; stroke-width:3.4!important; filter:drop-shadow(0 0 7px #7ce0cb99) }
+    .drag-hit { fill:transparent; stroke:transparent; pointer-events:all; touch-action:none; cursor:grab }
+    .drag-hit:active { cursor:grabbing }
+    .handle { fill:#fff2df!important; stroke:#7ce0cb!important; stroke-width:3.4!important; filter:drop-shadow(0 0 7px #7ce0cb99); pointer-events:none }
     .side { padding:28px 24px; display:flex; flex-direction:column; min-height:540px }
     .side { background:linear-gradient(160deg,#2b202c,#211923 70%); }
     .step { color:var(--green); text-transform:uppercase; font-size:.72rem; font-weight:750; letter-spacing:.15em }
@@ -122,9 +125,11 @@
   for(const name of ['AC²','BC²','AB²']){
     const text=document.createElementNS('http://www.w3.org/2000/svg','text'); text.textContent=name; text.setAttribute('fill','#496d55'); text.setAttribute('font-family','ui-sans-serif,system-ui'); text.setAttribute('font-size','17'); text.setAttribute('font-weight','650'); text.setAttribute('text-anchor','middle'); document.getElementById('areaLabels').appendChild(text); areaLabels[name]=text;
   }
-  const handles={};
+  const handles={}, handleNodes={};
   for(const name of ['A','B','C']){
-    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle'); circle.setAttribute('r','10'); circle.setAttribute('fill','#fff'); circle.setAttribute('stroke','#286a50'); circle.setAttribute('stroke-width','3'); circle.setAttribute('class','handle'); circle.setAttribute('tabindex','0'); circle.setAttribute('role','button'); circle.setAttribute('aria-label',name==='C'?'Point C; drag around the circle':'Point '+name+'; drag freely'); circle.style.cursor='grab'; circle.style.touchAction='none'; svg.appendChild(circle); handles[name]=circle;
+    const hit=document.createElementNS('http://www.w3.org/2000/svg','circle'), node=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    hit.setAttribute('r','54'); hit.setAttribute('class','drag-hit'); hit.setAttribute('tabindex','0'); hit.setAttribute('role','button'); hit.setAttribute('aria-label',name==='C'?'Point C; drag around the semicircle':'Point '+name+'; drag freely');
+    node.setAttribute('r','10'); node.setAttribute('class','handle'); svg.appendChild(hit); svg.appendChild(node); handles[name]=hit; handleNodes[name]=node;
   }
   const phases=[
     {at:0,title:'A right triangle',text:'Start with the draggable right triangle. Move any vertex; the angle at C remains right.'},
@@ -195,7 +200,7 @@
     for(const name of ['A','B','C','Z']){const p=name==='Z'?Z:{A,B,C}[name], q=add(p,labelOffsets[name]);labels[name].setAttribute('x',q.x);labels[name].setAttribute('y',q.y+8)}
     const centroid=pts=>mul(pts.reduce((sum,p)=>add(sum,p),{x:0,y:0}),.25);
     [["AC²",[A,C,D,X]],["BC²",squareBC],["AB²",[A,B,squareFar,Y]]].forEach(([name,pts])=>{const q=centroid(pts);areaLabels[name].setAttribute('x',q.x);areaLabels[name].setAttribute('y',q.y+6)});
-    for(const name of ['A','B','C']){handles[name].setAttribute('cx',{A,B,C}[name].x);handles[name].setAttribute('cy',{A,B,C}[name].y)}
+    for(const name of ['A','B','C']){handles[name].setAttribute('cx',{A,B,C}[name].x);handles[name].setAttribute('cy',{A,B,C}[name].y);handleNodes[name].setAttribute('cx',{A,B,C}[name].x);handleNodes[name].setAttribute('cy',{A,B,C}[name].y)}
     geom={X,D,Z,Y,U,squareFar,nBC,orientation,abLength,acLength,bcLength};
     render();
   };
